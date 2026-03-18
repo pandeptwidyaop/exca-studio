@@ -1,0 +1,22 @@
+# Backend
+/backend/pb_data
+/backend/pb_migrations
+/backend/*.db
+/backend/excalidraw-studio-backend
+
+# Frontend
+/frontend/node_modules
+/frontend/dist
+/frontend/.env
+/frontend/.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
