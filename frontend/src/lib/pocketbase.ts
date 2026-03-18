@@ -1,6 +1,7 @@
 import PocketBase from 'pocketbase';
 
-const pb = new PocketBase('http://localhost:8092');
+// Use same origin as the page (works for any host)
+const pb = new PocketBase(window.location.origin);
 
 // Enable auto cancellation for pending requests
 pb.autoCancellation(false);

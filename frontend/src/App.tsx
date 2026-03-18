@@ -62,8 +62,15 @@ function App() {
     setCurrentProject(null);
   };
 
-  const handleSelectProject = (project: Project) => {
-    setCurrentProject(project);
+  const handleSelectProject = async (project: Project) => {
+    // Fetch fresh data from server to get latest scene
+    try {
+      const fresh = await pb.collection('projects').getOne(project.id);
+      setCurrentProject(fresh as unknown as Project);
+    } catch (err) {
+      console.error('Failed to load project:', err);
+      setCurrentProject(project); // Fallback to cached
+    }
   };
 
   const handleCreateProject = () => {

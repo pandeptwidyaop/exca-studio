@@ -40,7 +40,16 @@ export default function Sidebar({
   };
 
   return (
-    <div className="w-64 bg-gray-900 text-white flex flex-col h-full">
+    <div 
+      className="w-64 bg-gray-900 text-white flex flex-col h-full"
+      style={{ 
+        width: '16rem', 
+        backgroundColor: '#111827', 
+        color: 'white',
+        flexShrink: 0,
+        zIndex: 10,
+      }}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-700">
         <h1 className="text-xl font-bold">Excalidraw Studio</h1>

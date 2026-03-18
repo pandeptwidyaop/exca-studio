@@ -1,22 +1,20 @@
-# Backend
-/backend/pb_data
-/backend/pb_migrations
-/backend/*.db
-/backend/excalidraw-studio-backend
+# Dependencies
+node_modules/
 
-# Frontend
-/frontend/node_modules
-/frontend/dist
-/frontend/.env
-/frontend/.env.local
+# Build outputs (keep web/ for deployment)
+frontend/dist/
+
+# PocketBase data
+backend/pb_data/
+
+# IDE
+.idea/
+.vscode/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Env
+.env
+.env.local
