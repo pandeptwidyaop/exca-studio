@@ -8,6 +8,7 @@ interface SidebarProps {
   onSelectProject: (project: Project) => void;
   onCreateProject: () => void;
   onLogout: () => void;
+  onToggle: () => void;
 }
 
 export default function Sidebar({
@@ -16,6 +17,7 @@ export default function Sidebar({
   onSelectProject,
   onCreateProject,
   onLogout,
+  onToggle,
 }: SidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -52,7 +54,18 @@ export default function Sidebar({
     >
       {/* Header */}
       <div className="p-4 border-b border-gray-700">
-        <h1 className="text-xl font-bold">Excalidraw Studio</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Excalidraw Studio</h1>
+          <button
+            onClick={onToggle}
+            className="p-1 hover:bg-gray-700 rounded"
+            title="Hide sidebar"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
         <p className="text-sm text-gray-400 mt-1">
           {pb.authStore.model?.email}
         </p>
