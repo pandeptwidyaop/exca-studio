@@ -1,10 +1,10 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
 	_ "excalidraw-studio-backend/migrations"
@@ -14,6 +14,9 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
+
+//go:embed web/*
+var embeddedFiles embed.FS
 
 func main() {
 	app := pocketbase.New()
@@ -46,52 +49,43 @@ func setupRoutes(e *core.ServeEvent, app *pocketbase.PocketBase) {
 		})
 	})
 
-	// Serve frontend (SPA)
+	// Serve embedded frontend (SPA)
 	serveFrontend(e)
 }
 
 func serveFrontend(e *core.ServeEvent) {
-	// Determine frontend path
-	frontendPath := os.Getenv("FRONTEND_PATH")
-	if frontendPath == "" {
-		frontendPath = "../frontend/dist"
-	}
-
-	absPath, err := filepath.Abs(frontendPath)
+	// Get the web subdirectory from embedded files
+	webFS, err := fs.Sub(embeddedFiles, "web")
 	if err != nil {
-		log.Printf("Warning: Could not resolve frontend path: %v", err)
+		log.Printf("Warning: Could not access embedded web files: %v", err)
 		return
 	}
 
-	// Check if frontend exists
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		log.Printf("Warning: Frontend not found at %s", absPath)
-		return
-	}
-
-	log.Printf("Serving frontend from: %s", absPath)
+	log.Println("Serving embedded frontend")
 
 	// Serve static files
 	e.Router.GET("/*", func(c echo.Context) error {
 		path := c.Request().URL.Path
 
-		// Skip API routes
+		// Skip API routes and PocketBase admin
 		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/_") {
 			return echo.NewHTTPError(http.StatusNotFound)
 		}
 
+		// Remove leading slash for fs.FS
+		filePath := strings.TrimPrefix(path, "/")
+		if filePath == "" {
+			filePath = "index.html"
+		}
+
 		// Try to serve the file
-		filePath := filepath.Join(absPath, path)
-		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
-			return c.File(filePath)
+		file, err := webFS.Open(filePath)
+		if err == nil {
+			file.Close()
+			return c.FileFS(filePath, webFS)
 		}
 
 		// SPA fallback - serve index.html for client-side routing
-		indexPath := filepath.Join(absPath, "index.html")
-		if _, err := os.Stat(indexPath); err == nil {
-			return c.File(indexPath)
-		}
-
-		return echo.NewHTTPError(http.StatusNotFound)
+		return c.FileFS("index.html", webFS)
 	})
 }
