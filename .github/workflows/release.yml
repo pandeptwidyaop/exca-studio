@@ -193,16 +193,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Job 4: Docker build & push to GHCR (per-arch, using pre-built binaries)
-  docker:
-    name: Docker Release
+  # Job 4: Docker per-arch build (push by digest, no tags yet)
+  docker-build:
+    name: Docker Build (${{ matrix.platform }})
     needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      id-token: write
-      attestations: write
     strategy:
       matrix:
         include:
@@ -210,6 +208,9 @@ jobs:
             artifact: exca-studio-linux-amd64
           - platform: linux/arm64
             artifact: exca-studio-linux-arm64
+    outputs:
+      digest-amd64: ${{ steps.digest.outputs.digest-amd64 }}
+      digest-arm64: ${{ steps.digest.outputs.digest-arm64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -220,41 +221,10 @@ jobs:
           name: ${{ matrix.artifact }}
           path: backend/
 
-      - name: Make binary executable
+      - name: Prepare binary
         run: |
           mv backend/${{ matrix.artifact }} backend/exca-studio
           chmod +x backend/exca-studio
-
-      - name: Prepare version and tags
-        id: version
-        run: |
-          VERSION="${{ needs.version.outputs.new_release_version }}"
-          VERSION=${VERSION#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          if [[ ! "$VERSION" =~ "-" ]]; then
-            MAJOR=$(echo $VERSION | cut -d. -f1)
-            MINOR=$(echo $VERSION | cut -d. -f2)
-            echo "is_stable=true" >> $GITHUB_OUTPUT
-            echo "major_minor=${MAJOR}.${MINOR}" >> $GITHUB_OUTPUT
-          else
-            echo "is_stable=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=latest,enable=${{ steps.version.outputs.is_stable }}
-            type=raw,value=${{ steps.version.outputs.major_minor }},enable=${{ steps.version.outputs.is_stable }}
-          labels: |
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -266,15 +236,88 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build and Push (by digest)
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: mode=max
-          sbom: true
+          tags: ghcr.io/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.platform }},mode=max
+
+      - name: Export digest
+        id: digest
+        run: |
+          PLATFORM="${{ matrix.platform }}"
+          ARCH="${PLATFORM#linux/}"
+          echo "digest-${ARCH}=${{ steps.push.outputs.digest }}" >> $GITHUB_OUTPUT
+
+      - name: Save digest to file
+        run: |
+          mkdir -p /tmp/digests
+          echo "${{ steps.push.outputs.digest }}" > /tmp/digests/${{ matrix.artifact }}
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.artifact }}
+          path: /tmp/digests/${{ matrix.artifact }}
+          retention-days: 1
+
+  # Job 5: Merge per-arch images into multi-arch manifest
+  docker-merge:
+    name: Docker Manifest
+    needs: [version, docker-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download all digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - name: Prepare version and tags
+        id: version
+        run: |
+          VERSION="${{ needs.version.outputs.new_release_version }}"
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          TAGS="ghcr.io/${{ github.repository }}:${VERSION}"
+          if [[ ! "$VERSION" =~ "-" ]]; then
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            TAGS="${TAGS} ghcr.io/${{ github.repository }}:${MAJOR}.${MINOR}"
+            TAGS="${TAGS} ghcr.io/${{ github.repository }}:${MAJOR}"
+            TAGS="${TAGS} ghcr.io/${{ github.repository }}:latest"
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          DIGESTS=$(cat /tmp/digests/*)
+          IMAGE="ghcr.io/${{ github.repository }}"
+
+          # Build source list from digests
+          SOURCES=""
+          for DIGEST in $DIGESTS; do
+            SOURCES="${SOURCES} ${IMAGE}@${DIGEST}"
+          done
+
+          # Create manifest for each tag
+          for TAG in ${{ steps.version.outputs.tags }}; do
+            echo "Creating manifest for ${TAG}"
+            docker buildx imagetools create -t ${TAG} ${SOURCES}
+          done
