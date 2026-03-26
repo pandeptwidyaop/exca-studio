@@ -5,6 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Exca Studio</title>
+    <script>
+      // Load Excalidraw fonts from local /fonts/ instead of esm.sh CDN (avoids CORS)
+      window.EXCALIDRAW_ASSET_PATH = "/fonts/";
+    </script>
   </head>
   <body>
     <div id="root"></div>
