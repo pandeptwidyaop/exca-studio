@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.1...v1.0.2) (2026-03-26)
+
+### Bug Fixes
+
+* set scene JSON field MaxSize to 20MB ([12166c0](https://github.com/pandeptwidyaop/exca-studio/commit/12166c060b7f1648ca9b60af8fe05413c3e6a9ba))
+
 ## [1.0.1](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.0...v1.0.1) (2026-03-26)
 
 ### Bug Fixes
