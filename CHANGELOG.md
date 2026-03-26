@@ -1,3 +1,13 @@
+## [1.0.3](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.2...v1.0.3) (2026-03-26)
+
+### Bug Fixes
+
+* update page title from 'frontend' to 'Exca Studio' ([1f9ea14](https://github.com/pandeptwidyaop/exca-studio/commit/1f9ea14585048dcb96520f79c57487fec88dda1d))
+
+### Performance Improvements
+
+* **ci:** use pre-built binaries for Docker build ([406da91](https://github.com/pandeptwidyaop/exca-studio/commit/406da91a69ba960adb861d565e0f2c98c6a23112))
+
 ## [1.0.2](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.1...v1.0.2) (2026-03-26)
 
 ### Bug Fixes
