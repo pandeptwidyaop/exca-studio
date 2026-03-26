@@ -1,3 +1,9 @@
+## [1.0.5](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.4...v1.0.5) (2026-03-26)
+
+### Bug Fixes
+
+* self-host Excalidraw fonts (fix CORS error) ([463fce4](https://github.com/pandeptwidyaop/exca-studio/commit/463fce41d821178367149aeafa6ce6f1511c9325))
+
 ## [1.0.4](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.3...v1.0.4) (2026-03-26)
 
 ### Bug Fixes
