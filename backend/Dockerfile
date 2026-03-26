@@ -1,5 +1,8 @@
 FROM golang:1.22-alpine AS builder
 
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+
 WORKDIR /app
 
 # Install dependencies
@@ -9,8 +12,10 @@ RUN go mod download
 # Copy source + embedded frontend (web/)
 COPY . .
 
-# Build static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /exca-studio .
+# Build static binary with version info
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w -X main.Version=${VERSION} -X main.GitCommit=${GIT_COMMIT}" \
+    -o /exca-studio .
 
 # ── Runtime ──────────────────────────────────────────
 FROM alpine:3.20

@@ -2,41 +2,81 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+      - beta
+      - alpha
 
 permissions:
   contents: write
-  packages: write
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  issues: write
+  pull-requests: write
 
 jobs:
-  build-and-release:
+  # Job 1: Determine next version using semantic-release (dry-run)
+  version:
+    name: Determine Version
+    runs-on: ubuntu-latest
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Semantic Release (Dry Run)
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: true
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Output Version Info
+        run: |
+          echo "New release published: ${{ steps.semantic.outputs.new_release_published }}"
+          echo "New release version: ${{ steps.semantic.outputs.new_release_version }}"
+
+  # Job 2: Build binaries with version
+  build:
+    name: Build Binaries
+    needs: version
+    if: needs.version.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - goos: linux
             goarch: amd64
-            suffix: linux-amd64
+            output: exca-studio-linux-amd64
           - goos: linux
             goarch: arm64
-            suffix: linux-arm64
+            output: exca-studio-linux-arm64
           - goos: darwin
             goarch: amd64
-            suffix: darwin-amd64
+            output: exca-studio-darwin-amd64
           - goos: darwin
             goarch: arm64
-            suffix: darwin-arm64
+            output: exca-studio-darwin-arm64
           - goos: windows
             goarch: amd64
-            suffix: windows-amd64.exe
+            output: exca-studio-windows-amd64.exe
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -66,45 +106,108 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
+          VERSION: ${{ needs.version.outputs.new_release_version }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          go build -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o ../exca-studio-${{ matrix.suffix }}
+          mkdir -p ../dist
+          go build -ldflags="-s -w \
+            -X main.Version=${VERSION} \
+            -X main.GitCommit=$(git rev-parse --short HEAD) \
+            -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o ../dist/${{ matrix.output }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: exca-studio-${{ matrix.suffix }}
-          path: exca-studio-${{ matrix.suffix }}
+          name: ${{ matrix.output }}
+          path: dist/${{ matrix.output }}
+          retention-days: 1
 
-  github-release:
-    needs: build-and-release
+  # Job 3: Create checksums and release
+  release:
+    name: Create Release
+    needs: [version, build]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Download All Artifacts
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          path: artifacts
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Prepare release assets
+        run: |
+          mkdir -p dist release
+          find artifacts -type f -exec cp {} dist/ \;
+          ls -lah dist/
+
+      - name: Make binaries executable
+        run: chmod +x dist/*
+
+      - name: Create tar.gz archives
+        run: |
+          cd dist
+          for binary in *; do
+            if [ -f "$binary" ] && [[ "$binary" != *.tar.gz ]] && [[ "$binary" != checksums.txt ]]; then
+              os=$(echo $binary | sed 's/exca-studio-//' | cut -d- -f1)
+              arch=$(echo $binary | sed 's/exca-studio-//' | cut -d- -f2 | sed 's/\.exe$//')
+              if [ "$arch" = "amd64" ]; then arch="x86_64"; fi
+              if [ "$arch" = "arm64" ]; then arch="aarch64"; fi
+              archive_name="exca-studio_${{ needs.version.outputs.new_release_version }}_${os}_${arch}.tar.gz"
+              if [[ "$binary" == *.exe ]]; then
+                cp "$binary" exca-studio.exe
+                tar -czf ../release/$archive_name exca-studio.exe
+                rm exca-studio.exe
+              else
+                cp "$binary" exca-studio
+                tar -czf ../release/$archive_name exca-studio
+                rm exca-studio
+              fi
+            fi
+          done
+          cd ..
+          ls -lah release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v4
         with:
-          generate_release_notes: true
-          files: artifacts/**/*
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Job 4: Docker build & push to GHCR
   docker:
+    name: Docker Release
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -122,23 +225,39 @@ jobs:
       - name: Copy Frontend to Backend
         run: cp -r frontend/dist/* backend/web/
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare version tags
+        id: version
+        run: |
+          VERSION="${{ needs.version.outputs.new_release_version }}"
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Docker Meta
+          TAGS="ghcr.io/${{ github.repository }}:${VERSION}"
+
+          if [[ ! "$VERSION" =~ "-" ]]; then
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            TAGS="${TAGS},ghcr.io/${{ github.repository }}:${MAJOR}.${MINOR}"
+            TAGS="${TAGS},ghcr.io/${{ github.repository }}:${MAJOR}"
+            TAGS="${TAGS},ghcr.io/${{ github.repository }}:latest"
+          else
+            if [[ "$VERSION" =~ "alpha" ]]; then
+              TAGS="${TAGS},ghcr.io/${{ github.repository }}:alpha"
+            elif [[ "$VERSION" =~ "beta" ]]; then
+              TAGS="${TAGS},ghcr.io/${{ github.repository }}:beta"
+            fi
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest
+          images: ghcr.io/${{ github.repository }}
+          tags: ${{ steps.version.outputs.tags }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -146,13 +265,26 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and Push Docker Image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          push: true
           platforms: linux/amd64,linux/arm64
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            GIT_COMMIT=${{ github.sha }}
