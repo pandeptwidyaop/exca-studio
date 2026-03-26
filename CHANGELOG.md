@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.0...v1.0.1) (2026-03-26)
+
+### Bug Fixes
+
+* **ci:** fix Docker image tags (remove double registry prefix) ([42d1809](https://github.com/pandeptwidyaop/exca-studio/commit/42d18097071f721ae28cc44035a7a146184b15c3))
+
 ## 1.0.0 (2026-03-26)
 
 ### Features
