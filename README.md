@@ -124,6 +124,52 @@ http://localhost:8092/_/
 
 Create an admin account on first visit to manage users, projects, and collections.
 
+## 🐳 Docker
+
+Pull from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/pandeptwidyaop/exca-studio:latest
+
+docker run -d \
+  -p 8092:8092 \
+  -v exca-data:/data \
+  ghcr.io/pandeptwidyaop/exca-studio:latest
+```
+
+Open http://localhost:8092
+
+### Docker Compose
+
+```yaml
+services:
+  exca-studio:
+    image: ghcr.io/pandeptwidyaop/exca-studio:latest
+    ports:
+      - "8092:8092"
+    volumes:
+      - exca-data:/data
+    restart: unless-stopped
+
+volumes:
+  exca-data:
+```
+
+## 📦 Releases
+
+Releases follow [Semantic Versioning](https://semver.org/). Pre-built binaries for Linux, macOS, and Windows are available on the [Releases page](https://github.com/pandeptwidyaop/exca-studio/releases).
+
+To create a new release:
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This triggers GitHub Actions to:
+1. Build binaries for all platforms (linux/mac/windows × amd64/arm64)
+2. Create a GitHub Release with assets
+3. Build & push Docker image to `ghcr.io/pandeptwidyaop/exca-studio`
+
 ## 🗺 Roadmap
 
 - [ ] Real-time collaboration (multiple users on same canvas)

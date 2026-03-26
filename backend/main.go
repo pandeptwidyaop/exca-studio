@@ -2,9 +2,11 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	_ "excalidraw-studio-backend/migrations"
@@ -15,10 +17,19 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
+// Version is set at build time via -ldflags
+var Version = "dev"
+
 //go:embed web/*
 var embeddedFiles embed.FS
 
 func main() {
+	// Handle --version flag
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("exca-studio %s\n", Version)
+		os.Exit(0)
+	}
+
 	app := pocketbase.New()
 
 	// Enable automigrate for development
