@@ -1,3 +1,9 @@
+## [1.0.4](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.3...v1.0.4) (2026-03-26)
+
+### Bug Fixes
+
+* **ci:** fix multi-arch Docker manifest (per-arch build + merge) ([a50fa93](https://github.com/pandeptwidyaop/exca-studio/commit/a50fa93a86adbf667627449563282915870c324b))
+
 ## [1.0.3](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.2...v1.0.3) (2026-03-26)
 
 ### Bug Fixes
