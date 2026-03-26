@@ -46,7 +46,9 @@ func init() {
 					Name:     "scene",
 					Type:     schema.FieldTypeJson,
 					Required: false,
-					Options:  &schema.JsonOptions{},
+					Options: &schema.JsonOptions{
+						MaxSize: 20000000, // 20MB — Excalidraw scenes can be large
+					},
 				},
 			),
 		}
