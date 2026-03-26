@@ -1,120 +1,154 @@
-# Excalidraw Studio
+# 🎨 Exca Studio
 
-Multi-project Excalidraw with user authentication. Built with Go, PocketBase, React, and Excalidraw.
+A self-hosted, multi-project whiteboard application built on top of [Excalidraw](https://excalidraw.com/). Create unlimited projects, each with its own persistent canvas — all with user authentication.
 
-## Features
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
+[![PocketBase](https://img.shields.io/badge/PocketBase-0.22-B8DBE4)](https://pocketbase.io/)
 
-- 🔐 User authentication (login/register)
-- 📁 Multiple projects management
-- 🎨 Excalidraw canvas integration
-- 💾 Auto-save to database
-- 📱 Sidebar project list with quick switching
+## ✨ Features
 
-## Tech Stack
+- 🔐 **User Authentication** — Login/register with email & password
+- 📁 **Multi-Project** — Create and manage unlimited projects
+- 🎨 **Full Excalidraw** — All drawing tools, shapes, text, arrows, and more
+- 💾 **Auto-Save** — Canvas changes saved automatically (1s debounce)
+- 📱 **Collapsible Sidebar** — Clean UI with toggle-able project navigation
+- 🌙 **Dark Theme** — Easy on the eyes
+- 🚀 **Single Binary** — Frontend embedded in Go binary for easy deployment
 
-**Backend:**
-- Go 1.22+
-- PocketBase (embedded database + auth)
+## 🛠 Tech Stack
 
-**Frontend:**
-- React 18
-- TypeScript
-- Vite
-- TailwindCSS
-- @excalidraw/excalidraw
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Go 1.22+ with [PocketBase](https://pocketbase.io/) (embedded SQLite + auth + admin) |
+| **Frontend** | React 19 + TypeScript + Vite + TailwindCSS |
+| **Canvas** | [@excalidraw/excalidraw](https://www.npmjs.com/package/@excalidraw/excalidraw) |
+| **Database** | SQLite (via PocketBase, zero config) |
 
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-
 - Go 1.22+
 - Node.js 18+
-- npm/yarn
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/pandeptwidyaop/excalidraw-studio.git
-   cd excalidraw-studio
-   ```
-
-2. **Setup Backend:**
-   ```bash
-   cd backend
-   go mod download
-   ```
-
-3. **Setup Frontend:**
-   ```bash
-   cd frontend
-   npm install
-   ```
+- npm
 
 ### Development
 
-1. **Start Backend (Port 8092):**
-   ```bash
-   cd backend
-   go run main.go serve
-   ```
+```bash
+# Clone
+git clone https://github.com/pandeptwidyaop/exca-studio.git
+cd exca-studio
 
-2. **Start Frontend (Port 5173):**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
+# Backend (Terminal 1)
+cd backend
+go mod download
+go run main.go serve --http=127.0.0.1:8092
 
-3. Open http://localhost:5173
+# Frontend (Terminal 2)
+cd frontend
+npm install
+npm run dev
+```
 
-### Production Build
+Open http://localhost:5173
 
-1. **Build Frontend:**
-   ```bash
-   cd frontend
-   npm run build
-   ```
+### Production (Single Binary)
 
-2. **Run Backend (serves frontend):**
-   ```bash
-   cd backend
-   go run main.go serve --http=0.0.0.0:8092
-   ```
+```bash
+# Build frontend
+cd frontend
+npm install && npm run build
 
-## Project Structure
+# Build Go binary (embeds frontend)
+cd backend
+go build -o exca-studio
+./exca-studio serve --http=0.0.0.0:8092
+```
+
+Open http://your-server:8092
+
+## 📦 Project Structure
 
 ```
-excalidraw-studio/
+exca-studio/
 ├── backend/
-│   ├── main.go              # Entry point
-│   ├── migrations/          # Database migrations
+│   ├── main.go              # Entry point + API routes
+│   ├── migrations/          # Database schema (auto-run)
+│   ├── pb_data/             # SQLite data (auto-created)
 │   └── go.mod
 ├── frontend/
 │   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── lib/             # PocketBase client
-│   │   ├── App.tsx
-│   │   └── main.tsx
+│   │   ├── components/
+│   │   │   ├── Auth.tsx     # Login/Register UI
+│   │   │   ├── Sidebar.tsx  # Project list + navigation
+│   │   │   └── Canvas.tsx   # Excalidraw wrapper + auto-save
+│   │   ├── lib/
+│   │   │   └── pocketbase.ts # API client
+│   │   ├── App.tsx          # Main app logic
+│   │   └── main.tsx         # React entry
 │   ├── package.json
 │   └── vite.config.ts
+├── LICENSE
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
 └── README.md
 ```
 
-## Database Schema
+## 💾 Database Schema
 
-**users** (built-in PocketBase collection)
-- id
-- email
-- password (hashed)
+**users** (built-in PocketBase)
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Primary key (auto) |
+| email | text | User email |
+| password | text | Hashed password |
 
 **projects**
-- id
-- user (relation → users)
-- name (text)
-- scene (json) - Excalidraw scene data
-- created (auto)
-- updated (auto)
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Primary key (auto) |
+| user | relation | FK → users |
+| name | text | Project name |
+| scene | json | Excalidraw scene data |
+| created | datetime | Auto timestamp |
+| updated | datetime | Auto timestamp |
 
-## License
+## 🔑 Admin Panel
 
-MIT
+PocketBase includes a built-in admin UI:
+
+```
+http://localhost:8092/_/
+```
+
+Create an admin account on first visit to manage users, projects, and collections.
+
+## 🗺 Roadmap
+
+- [ ] Real-time collaboration (multiple users on same canvas)
+- [ ] Project sharing via public links
+- [ ] Thumbnail previews in project list
+- [ ] Export to PNG/SVG/PDF
+- [ ] Version history & undo
+- [ ] Project folders/categories
+- [ ] Light/dark theme toggle
+- [ ] Mobile responsive improvements
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR.
+
+## 📄 License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- [Excalidraw](https://excalidraw.com/) — The amazing open-source whiteboard
+- [PocketBase](https://pocketbase.io/) — Backend in a single file
+- [TailwindCSS](https://tailwindcss.com/) — Utility-first CSS
+
+---
+
+**Built with ❤️ by [Pande Putu Widya Okta Pratama](https://github.com/pandeptwidyaop)**
