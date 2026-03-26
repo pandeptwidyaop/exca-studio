@@ -225,36 +225,32 @@ jobs:
       - name: Copy Frontend to Backend
         run: cp -r frontend/dist/* backend/web/
 
-      - name: Prepare version tags
+      - name: Prepare version and tags
         id: version
         run: |
           VERSION="${{ needs.version.outputs.new_release_version }}"
           VERSION=${VERSION#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          TAGS="ghcr.io/${{ github.repository }}:${VERSION}"
-
+          # Build tag list for docker/metadata-action (just the tag part, no registry)
           if [[ ! "$VERSION" =~ "-" ]]; then
             MAJOR=$(echo $VERSION | cut -d. -f1)
             MINOR=$(echo $VERSION | cut -d. -f2)
-            TAGS="${TAGS},ghcr.io/${{ github.repository }}:${MAJOR}.${MINOR}"
-            TAGS="${TAGS},ghcr.io/${{ github.repository }}:${MAJOR}"
-            TAGS="${TAGS},ghcr.io/${{ github.repository }}:latest"
+            echo "is_stable=true" >> $GITHUB_OUTPUT
+            echo "major_minor=${MAJOR}.${MINOR}" >> $GITHUB_OUTPUT
           else
-            if [[ "$VERSION" =~ "alpha" ]]; then
-              TAGS="${TAGS},ghcr.io/${{ github.repository }}:alpha"
-            elif [[ "$VERSION" =~ "beta" ]]; then
-              TAGS="${TAGS},ghcr.io/${{ github.repository }}:beta"
-            fi
+            echo "is_stable=false" >> $GITHUB_OUTPUT
           fi
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
-          tags: ${{ steps.version.outputs.tags }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable=${{ steps.version.outputs.is_stable }}
+            type=raw,value=${{ steps.version.outputs.major_minor }},enable=${{ steps.version.outputs.is_stable }}
           labels: |
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
