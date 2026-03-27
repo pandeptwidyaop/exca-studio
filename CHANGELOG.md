@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.5...v1.1.0) (2026-03-27)
+
+### Features
+
+* add project rename and delete with confirmation ([2757021](https://github.com/pandeptwidyaop/exca-studio/commit/275702171a1b51fc2f4df2c28a367c3008e3b219))
+
 ## [1.0.5](https://github.com/pandeptwidyaop/exca-studio/compare/v1.0.4...v1.0.5) (2026-03-26)
 
 ### Bug Fixes
