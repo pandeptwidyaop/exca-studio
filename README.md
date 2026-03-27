@@ -197,4 +197,4 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 ---
 
-**Built with ❤️ by [Pande Putu Widya Okta Pratama](https://github.com/pandeptwidyaop)**
+**Built with ❤️ by [@pandeptwidyaop](https://github.com/pandeptwidyaop)**
