@@ -81,6 +81,7 @@ function App() {
   const handleDeleted = async (projectId: string) => {
     await loadProjects();
     if (projectId === activeProjectId) {
+      // replace, not push: don't leave the deleted project's URL in history
       navigate('/', { replace: true });
     }
   };

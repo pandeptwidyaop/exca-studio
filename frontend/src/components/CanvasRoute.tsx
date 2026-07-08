@@ -12,7 +12,10 @@ export default function CanvasRoute() {
   useEffect(() => {
     let cancelled = false;
 
-    if (!id) return;
+    if (!id) {
+      navigate('/', { replace: true });
+      return;
+    }
 
     pb.collection('projects')
       .getOne(id)

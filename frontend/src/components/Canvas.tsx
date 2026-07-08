@@ -12,6 +12,11 @@ export default function Canvas({ project }: CanvasProps) {
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>('');
+  const pendingSaveRef = useRef<{
+    projectId: string;
+    sceneData: object;
+    sceneString: string;
+  } | null>(null);
 
   // Load scene when project changes
   useEffect(() => {
@@ -25,16 +30,11 @@ export default function Canvas({ project }: CanvasProps) {
       // Reset last saved when project changes
       lastSavedRef.current = '';
     }
-  }, [project?.id, excalidrawAPI]);
+  }, [project.id, excalidrawAPI]);
 
   // Auto-save on change (properly debounced)
   const handleChange = useCallback(
     (elements: any, appState: any, files: any) => {
-      // Clear existing timer
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
       // Create scene data
       const sceneData = {
         elements,
@@ -52,14 +52,28 @@ export default function Canvas({ project }: CanvasProps) {
         return; // No change, skip save
       }
 
+      pendingSaveRef.current = {
+        projectId: project.id,
+        sceneData,
+        sceneString,
+      };
+
+      // Clear existing timer
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
       // Debounce save (2 seconds)
       saveTimeoutRef.current = setTimeout(async () => {
+        const pending = pendingSaveRef.current;
+        if (!pending) return;
+        pendingSaveRef.current = null;
         setIsSaving(true);
         try {
-          await pb.collection('projects').update(project.id, {
-            scene: sceneData,
+          await pb.collection('projects').update(pending.projectId, {
+            scene: pending.sceneData,
           });
-          lastSavedRef.current = sceneString;
+          lastSavedRef.current = pending.sceneString;
         } catch (err) {
           console.error('Failed to save:', err);
         } finally {
@@ -67,14 +81,23 @@ export default function Canvas({ project }: CanvasProps) {
         }
       }, 2000);
     },
-    [project?.id]
+    [project.id]
   );
 
-  // Cleanup on unmount
+  // On unmount, flush any pending save so switching projects doesn't drop edits
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+      }
+      const pending = pendingSaveRef.current;
+      if (pending) {
+        pendingSaveRef.current = null;
+        pb.collection('projects')
+          .update(pending.projectId, { scene: pending.sceneData })
+          .catch((err) => {
+            console.error('Failed to save:', err);
+          });
       }
     };
   }, []);
