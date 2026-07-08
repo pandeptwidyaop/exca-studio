@@ -11,7 +11,6 @@ export default function CanvasRoute() {
 
   useEffect(() => {
     let cancelled = false;
-    setProject(null);
 
     if (!id) return;
 
@@ -34,7 +33,10 @@ export default function CanvasRoute() {
     };
   }, [id, navigate]);
 
-  if (!project) {
+  // A project fetched for a previous id is stale — render loading until the fetch for this id lands
+  const current = project && project.id === id ? project : null;
+
+  if (!current) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-100">
         <div className="text-gray-600">Loading...</div>
@@ -42,5 +44,5 @@ export default function CanvasRoute() {
     );
   }
 
-  return <Canvas project={project} />;
+  return <Canvas project={current} />;
 }
