@@ -4,7 +4,7 @@ import type { Project } from '../types';
 import pb from '../lib/pocketbase';
 
 interface CanvasProps {
-  project: Project | null;
+  project: Project;
 }
 
 export default function Canvas({ project }: CanvasProps) {
@@ -15,7 +15,7 @@ export default function Canvas({ project }: CanvasProps) {
 
   // Load scene when project changes
   useEffect(() => {
-    if (excalidrawAPI && project) {
+    if (excalidrawAPI) {
       const sceneData = project.scene || {};
       // Ensure collaborators is a Map (Excalidraw requirement)
       if (sceneData.appState) {
@@ -30,8 +30,6 @@ export default function Canvas({ project }: CanvasProps) {
   // Auto-save on change (properly debounced)
   const handleChange = useCallback(
     (elements: any, appState: any, files: any) => {
-      if (!project) return;
-
       // Clear existing timer
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -80,21 +78,6 @@ export default function Canvas({ project }: CanvasProps) {
       }
     };
   }, []);
-
-  if (!project) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-700 mb-2">
-            Welcome to Excalidraw Studio
-          </h2>
-          <p className="text-gray-500">
-            Select a project from the sidebar or create a new one
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div 

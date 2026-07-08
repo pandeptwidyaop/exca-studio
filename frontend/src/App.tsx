@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, useNavigate, useMatch } from 'react-router-dom';
 import Auth from './components/Auth';
 import Sidebar from './components/Sidebar';
-import Canvas from './components/Canvas';
+import Home from './components/Home';
+import CanvasRoute from './components/CanvasRoute';
 import pb from './lib/pocketbase';
 import type { Project } from './types';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const navigate = useNavigate();
+  const match = useMatch('/project/:id');
+  const activeProjectId = match?.params.id ?? null;
 
   // Check auth status on mount
   useEffect(() => {
@@ -27,14 +32,7 @@ function App() {
     });
   }, []);
 
-  // Load projects when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadProjects();
-    }
-  }, [isAuthenticated]);
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
       const records = await pb.collection('projects').getFullList({
         sort: '-created',
@@ -42,15 +40,19 @@ function App() {
       });
 
       setProjects(records as unknown as Project[]);
-
-      // Auto-select first project if none selected
-      if (!currentProject && records.length > 0) {
-        setCurrentProject(records[0] as unknown as Project);
-      }
     } catch (err) {
       console.error('Failed to load projects:', err);
+    } finally {
+      setProjectsLoaded(true);
     }
-  };
+  }, []);
+
+  // Load projects when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadProjects();
+    }
+  }, [isAuthenticated, loadProjects]);
 
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
@@ -60,22 +62,27 @@ function App() {
     pb.authStore.clear();
     setIsAuthenticated(false);
     setProjects([]);
-    setCurrentProject(null);
+    setProjectsLoaded(false);
   };
 
-  const handleSelectProject = async (project: Project) => {
-    // Fetch fresh data from server to get latest scene
-    try {
-      const fresh = await pb.collection('projects').getOne(project.id);
-      setCurrentProject(fresh as unknown as Project);
-    } catch (err) {
-      console.error('Failed to load project:', err);
-      setCurrentProject(project); // Fallback to cached
+  const handleSelectProject = (project: Project) => {
+    navigate(`/project/${project.id}`);
+  };
+
+  const handleCreated = async (project: Project) => {
+    await loadProjects();
+    navigate(`/project/${project.id}`);
+  };
+
+  const handleRenamed = () => {
+    loadProjects();
+  };
+
+  const handleDeleted = async (projectId: string) => {
+    await loadProjects();
+    if (projectId === activeProjectId) {
+      navigate('/', { replace: true });
     }
-  };
-
-  const handleCreateProject = () => {
-    loadProjects(); // Reload projects after creation
   };
 
   if (loading) {
@@ -96,14 +103,16 @@ function App() {
       {sidebarOpen && (
         <Sidebar
           projects={projects}
-          currentProject={currentProject}
+          currentProjectId={activeProjectId}
           onSelectProject={handleSelectProject}
-          onCreateProject={handleCreateProject}
+          onCreated={handleCreated}
+          onRenamed={handleRenamed}
+          onDeleted={handleDeleted}
           onLogout={handleLogout}
           onToggle={() => setSidebarOpen(false)}
         />
       )}
-      
+
       {/* Main content */}
       <div className="flex-1 relative">
         {/* Burger menu when sidebar is hidden */}
@@ -118,7 +127,11 @@ function App() {
             </svg>
           </button>
         )}
-        <Canvas project={currentProject} />
+        <Routes>
+          <Route path="/" element={<Home projects={projects} loaded={projectsLoaded} />} />
+          <Route path="/project/:id" element={<CanvasRoute />} />
+          <Route path="*" element={<Home projects={projects} loaded={projectsLoaded} />} />
+        </Routes>
       </div>
     </div>
   );

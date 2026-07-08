@@ -4,18 +4,22 @@ import pb from '../lib/pocketbase';
 
 interface SidebarProps {
   projects: Project[];
-  currentProject: Project | null;
+  currentProjectId: string | null;
   onSelectProject: (project: Project) => void;
-  onCreateProject: () => void;
+  onCreated: (project: Project) => void;
+  onRenamed: () => void;
+  onDeleted: (projectId: string) => void;
   onLogout: () => void;
   onToggle: () => void;
 }
 
 export default function Sidebar({
   projects,
-  currentProject,
+  currentProjectId,
   onSelectProject,
-  onCreateProject,
+  onCreated,
+  onRenamed,
+  onDeleted,
   onLogout,
   onToggle,
 }: SidebarProps) {
@@ -31,7 +35,7 @@ export default function Sidebar({
     if (!newProjectName.trim()) return;
 
     try {
-      await pb.collection('projects').create({
+      const record = await pb.collection('projects').create({
         user: pb.authStore.model?.id,
         name: newProjectName,
         scene: {},
@@ -39,7 +43,7 @@ export default function Sidebar({
 
       setNewProjectName('');
       setIsCreating(false);
-      onCreateProject();
+      onCreated(record as unknown as Project);
     } catch (err) {
       console.error('Failed to create project:', err);
     }
@@ -51,7 +55,7 @@ export default function Sidebar({
       await pb.collection('projects').update(projectId, { name: editName });
       setEditingId(null);
       setEditName('');
-      onCreateProject(); // refresh list
+      onRenamed();
     } catch (err) {
       console.error('Failed to rename project:', err);
     }
@@ -61,7 +65,7 @@ export default function Sidebar({
     try {
       await pb.collection('projects').delete(projectId);
       setDeleteConfirmId(null);
-      onCreateProject(); // refresh list
+      onDeleted(projectId);
     } catch (err) {
       console.error('Failed to delete project:', err);
     }
@@ -207,7 +211,7 @@ export default function Sidebar({
                     <button
                       onClick={() => onSelectProject(project)}
                       className={`flex-1 text-left px-3 py-2 rounded-l text-sm transition-colors truncate ${
-                        currentProject?.id === project.id
+                        currentProjectId === project.id
                           ? 'bg-blue-600 text-white'
                           : 'hover:bg-gray-800 text-gray-300'
                       }`}
@@ -223,7 +227,7 @@ export default function Sidebar({
                         );
                       }}
                       className={`px-2 py-2 rounded-r text-sm transition-colors opacity-0 group-hover:opacity-100 ${
-                        currentProject?.id === project.id
+                        currentProjectId === project.id
                           ? 'bg-blue-700 hover:bg-blue-800 text-white opacity-100'
                           : 'hover:bg-gray-700 text-gray-400'
                       } ${contextMenuId === project.id ? 'opacity-100' : ''}`}
