@@ -55,6 +55,8 @@ export default function Sidebar({
 
       setNewProjectName('');
       setIsCreating(false);
+      // Clear search so the newly created project is visible and highlighted
+      setSearchQuery('');
       onCreated(record as unknown as Project);
     } catch (err) {
       console.error('Failed to create project:', err);

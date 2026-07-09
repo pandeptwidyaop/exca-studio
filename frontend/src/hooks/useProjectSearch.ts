@@ -17,7 +17,7 @@ export default function useProjectSearch() {
       pb.collection('projects')
         .getFullList({
           sort: '-created',
-          filter: pb.filter('name ~ {:q}', { q: query }),
+          filter: pb.filter('name ~ {:q}', { q: query.trim() }),
         })
         .then((records) => {
           if (!cancelled) {
