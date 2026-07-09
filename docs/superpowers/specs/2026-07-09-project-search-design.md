@@ -31,7 +31,7 @@ On each keystroke, debounce 300 ms, then:
 ```ts
 pb.collection('projects').getFullList({
   sort: '-created',
-  filter: pb.filter('name ~ {:q}', { q: query }),
+  filter: pb.filter('name ~ {:q}', { q: query.trim() }),
 })
 ```
 
@@ -44,6 +44,7 @@ pb.collection('projects').getFullList({
 
 - Search results are regular list items: click navigates, and the existing rename/delete/context-menu actions work on them.
 - After a rename or delete while a search is active, the search re-runs with the same query (in addition to the existing `onRenamed`/`onDeleted` master-list reload).
+- Creating a project clears the search query, so the new project is immediately visible and highlighted (added during final review).
 - Clearing the query (typing it empty or clicking the ✕ button in the input) returns to the full list without a request.
 - Non-empty query with zero results → "No projects found" text in place of the list.
 - No loading spinner: results arrive fast on a local network; the previous list stays visible until new results land.
