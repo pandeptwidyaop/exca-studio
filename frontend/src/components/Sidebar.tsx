@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Project } from '../types';
 import pb from '../lib/pocketbase';
+import useProjectSearch from '../hooks/useProjectSearch';
 
 interface SidebarProps {
   projects: Project[];
@@ -30,6 +31,17 @@ export default function Sidebar({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
 
+  const {
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    results: searchResults,
+    refresh: refreshSearch,
+  } = useProjectSearch();
+
+  const isSearching = searchQuery.trim() !== '';
+  // While the first response is pending (results null), keep showing the full list
+  const visibleProjects = isSearching ? (searchResults ?? projects) : projects;
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
@@ -43,6 +55,8 @@ export default function Sidebar({
 
       setNewProjectName('');
       setIsCreating(false);
+      // Clear search so the newly created project is visible and highlighted
+      setSearchQuery('');
       onCreated(record as unknown as Project);
     } catch (err) {
       console.error('Failed to create project:', err);
@@ -56,6 +70,7 @@ export default function Sidebar({
       setEditingId(null);
       setEditName('');
       onRenamed();
+      refreshSearch();
     } catch (err) {
       console.error('Failed to rename project:', err);
     }
@@ -66,6 +81,7 @@ export default function Sidebar({
       await pb.collection('projects').delete(projectId);
       setDeleteConfirmId(null);
       onDeleted(projectId);
+      refreshSearch();
     } catch (err) {
       console.error('Failed to delete project:', err);
     }
@@ -129,6 +145,26 @@ export default function Sidebar({
             </button>
           </div>
 
+          {/* Search */}
+          <div className="relative mb-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search projects..."
+              className="w-full px-2 py-1 pr-7 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-blue-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-1 top-1/2 -translate-y-1/2 px-1 text-gray-400 hover:text-white text-sm"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           {/* New Project Form */}
           {isCreating && (
             <form onSubmit={handleCreate} className="mb-3">
@@ -163,7 +199,7 @@ export default function Sidebar({
 
           {/* Projects */}
           <div className="space-y-1">
-            {projects.map((project) => (
+            {visibleProjects.map((project) => (
               <div key={project.id} className="relative group">
                 {/* Editing mode */}
                 {editingId === project.id ? (
@@ -262,7 +298,13 @@ export default function Sidebar({
             ))}
           </div>
 
-          {projects.length === 0 && !isCreating && (
+          {isSearching && searchResults && searchResults.length === 0 && (
+            <p className="text-gray-500 text-sm text-center mt-4">
+              No projects found
+            </p>
+          )}
+
+          {!isSearching && projects.length === 0 && !isCreating && (
             <p className="text-gray-500 text-sm text-center mt-4">
               No projects yet. Create one!
             </p>
