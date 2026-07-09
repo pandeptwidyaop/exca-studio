@@ -4,7 +4,7 @@ import type { Project } from '../types';
 import pb from '../lib/pocketbase';
 
 interface CanvasProps {
-  project: Project | null;
+  project: Project;
 }
 
 export default function Canvas({ project }: CanvasProps) {
@@ -12,10 +12,15 @@ export default function Canvas({ project }: CanvasProps) {
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>('');
+  const pendingSaveRef = useRef<{
+    projectId: string;
+    sceneData: object;
+    sceneString: string;
+  } | null>(null);
 
   // Load scene when project changes
   useEffect(() => {
-    if (excalidrawAPI && project) {
+    if (excalidrawAPI) {
       const sceneData = project.scene || {};
       // Ensure collaborators is a Map (Excalidraw requirement)
       if (sceneData.appState) {
@@ -25,18 +30,11 @@ export default function Canvas({ project }: CanvasProps) {
       // Reset last saved when project changes
       lastSavedRef.current = '';
     }
-  }, [project?.id, excalidrawAPI]);
+  }, [project.id, excalidrawAPI]);
 
   // Auto-save on change (properly debounced)
   const handleChange = useCallback(
     (elements: any, appState: any, files: any) => {
-      if (!project) return;
-
-      // Clear existing timer
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
       // Create scene data
       const sceneData = {
         elements,
@@ -54,14 +52,28 @@ export default function Canvas({ project }: CanvasProps) {
         return; // No change, skip save
       }
 
+      pendingSaveRef.current = {
+        projectId: project.id,
+        sceneData,
+        sceneString,
+      };
+
+      // Clear existing timer
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
       // Debounce save (2 seconds)
       saveTimeoutRef.current = setTimeout(async () => {
+        const pending = pendingSaveRef.current;
+        if (!pending) return;
+        pendingSaveRef.current = null;
         setIsSaving(true);
         try {
-          await pb.collection('projects').update(project.id, {
-            scene: sceneData,
+          await pb.collection('projects').update(pending.projectId, {
+            scene: pending.sceneData,
           });
-          lastSavedRef.current = sceneString;
+          lastSavedRef.current = pending.sceneString;
         } catch (err) {
           console.error('Failed to save:', err);
         } finally {
@@ -69,32 +81,26 @@ export default function Canvas({ project }: CanvasProps) {
         }
       }, 2000);
     },
-    [project?.id]
+    [project.id]
   );
 
-  // Cleanup on unmount
+  // On unmount, flush any pending save so switching projects doesn't drop edits
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      const pending = pendingSaveRef.current;
+      if (pending) {
+        pendingSaveRef.current = null;
+        pb.collection('projects')
+          .update(pending.projectId, { scene: pending.sceneData })
+          .catch((err) => {
+            console.error('Failed to save:', err);
+          });
+      }
     };
   }, []);
-
-  if (!project) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-700 mb-2">
-            Welcome to Excalidraw Studio
-          </h2>
-          <p className="text-gray-500">
-            Select a project from the sidebar or create a new one
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div 
