@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	_ "excalidraw-studio-backend/migrations"
 	"excalidraw-studio-backend/collab"
+	_ "excalidraw-studio-backend/migrations"
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase"

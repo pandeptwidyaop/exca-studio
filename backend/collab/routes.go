@@ -56,6 +56,8 @@ func Register(e *core.ServeEvent, app *pocketbase.PocketBase, hub *Hub) {
 
 func serveWS(c echo.Context, app *pocketbase.PocketBase, hub *Hub) error {
 	token := c.QueryParam("token")
+	// Scrub the token from the URL so it never reaches the request logs.
+	c.Request().URL.RawQuery = ""
 	authRecord, err := app.Dao().FindAuthRecordByToken(token, app.Settings().RecordAuthToken.Secret)
 	if err != nil || authRecord == nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid auth token")

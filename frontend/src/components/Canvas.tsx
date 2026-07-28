@@ -5,7 +5,6 @@ import {
   restoreElements,
   CaptureUpdateAction,
 } from '@excalidraw/excalidraw';
-import { useNavigate } from 'react-router-dom';
 import type { Project } from '../types';
 import pb from '../lib/pocketbase';
 import CollabClient, { collabColor } from '../lib/collab';
@@ -22,11 +21,16 @@ interface RemoteCollaborator {
 }
 
 export default function Canvas({ project }: CanvasProps) {
-  const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
+  const [excalidrawAPIState, setExcalidrawAPIState] = useState<any>(null);
+  // Only accept the API of the Excalidraw instance keyed to THIS project —
+  // during a project switch the old instance's API must never drive effects.
+  const excalidrawAPI =
+    excalidrawAPIState && excalidrawAPIState.forProject === project.id
+      ? excalidrawAPIState.api
+      : null;
   const [isSaving, setIsSaving] = useState(false);
   const [collabConnected, setCollabConnected] = useState(true);
   const [onlineUsers, setOnlineUsers] = useState<CollabUser[]>([]);
-  const navigate = useNavigate();
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>('');
   const pendingSaveRef = useRef<{
@@ -131,7 +135,10 @@ export default function Canvas({ project }: CanvasProps) {
             ? 'You have been removed from this project.'
             : 'This project has been deleted.',
         );
-        navigate('/', { replace: true });
+        // Full reload so App refetches the project lists — SPA navigation
+        // would redirect back into the stale shared project (infinite loop).
+        window.location.hash = '#/';
+        window.location.reload();
       },
       onConnectionChange: (connected: boolean) => {
         connectedRef.current = connected;
@@ -154,7 +161,7 @@ export default function Canvas({ project }: CanvasProps) {
       collaboratorsRef.current = new Map();
       client.destroy();
     };
-    // navigate and myId are stable for the life of the session
+    // myId is stable for the life of the session
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id, excalidrawAPI]);
 
@@ -266,7 +273,7 @@ export default function Canvas({ project }: CanvasProps) {
       <div style={{ width: '100%', height: '100%' }}>
         <Excalidraw
           key={project.id}
-          excalidrawAPI={(api) => setExcalidrawAPI(api)}
+          excalidrawAPI={(api) => setExcalidrawAPIState({ api, forProject: project.id })}
           onChange={handleChange}
           onPointerUpdate={(payload: { pointer: { x: number; y: number } }) => {
             collabRef.current?.sendPointer(payload.pointer.x, payload.pointer.y);
