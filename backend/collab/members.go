@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v5"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -56,11 +57,14 @@ func registerMemberRoutes(e *core.ServeEvent, app *pocketbase.PocketBase, hub *H
 		if body.Role != "editor" && body.Role != "viewer" {
 			return apis.NewBadRequestError("role must be editor or viewer", nil)
 		}
-		email := strings.TrimSpace(strings.ToLower(body.Email))
-		user, err := app.Dao().FindAuthRecordByEmail("users", email)
-		if err != nil {
+		// Emails are stored with their original casing; match case-insensitively.
+		email := strings.ToLower(strings.TrimSpace(body.Email))
+		matches, err := app.Dao().FindRecordsByExpr("users",
+			dbx.NewExp("LOWER([[email]]) = {:email}", dbx.Params{"email": email}))
+		if err != nil || len(matches) == 0 {
 			return apis.NewNotFoundError("no registered user with that email", err)
 		}
+		user := matches[0]
 		if user.Id == project.GetString("user") {
 			return apis.NewBadRequestError("that user owns this project", nil)
 		}
