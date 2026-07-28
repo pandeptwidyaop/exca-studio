@@ -204,7 +204,15 @@ export default class CollabClient {
   destroy() {
     this.destroyed = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    if (this.broadcastTimer) clearTimeout(this.broadcastTimer);
+    if (this.broadcastTimer) {
+      clearTimeout(this.broadcastTimer);
+      this.broadcastTimer = null;
+      // Flush the pending batch so the final edit always goes out.
+      const els = this.pendingElements;
+      this.pendingElements = null;
+      if (els) this.flushElements(els);
+    }
+    this.connected = false;
     this.ws?.close();
   }
 }
