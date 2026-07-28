@@ -39,8 +39,11 @@ func (h *Hub) Join(projectID string, c RoomClient) (*Room, error) {
 			return room, nil
 		}
 
-		// The room closed between lookup and join (last client left or the
-		// project was deleted). Drop the dead room and retry.
+		// The room is closing (last client left or the project was
+		// deleted). Wait for its shutdown — including the final save —
+		// to finish so a fresh room cannot load a stale scene, then
+		// drop it and retry.
+		<-room.done
 		h.mu.Lock()
 		if h.rooms[projectID] == room {
 			delete(h.rooms, projectID)

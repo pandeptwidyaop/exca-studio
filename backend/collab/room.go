@@ -36,6 +36,8 @@ type Room struct {
 	store     SceneStore
 	loadOnce  sync.Once
 	loadErr   error
+	done      chan struct{} // closed once the room is fully shut down
+	closeOnce sync.Once
 
 	mu        sync.Mutex
 	clients   map[RoomClient]struct{}
@@ -58,6 +60,7 @@ func newRoom(projectID string, store SceneStore) *Room {
 	return &Room{
 		projectID: projectID,
 		store:     store,
+		done:      make(chan struct{}),
 		clients:   make(map[RoomClient]struct{}),
 		elements:  make(map[string]storedElement),
 		files:     make(map[string]json.RawMessage),
@@ -150,6 +153,7 @@ func (r *Room) leave(c RoomClient) bool {
 
 	if empty {
 		r.save(true)
+		r.closeOnce.Do(func() { close(r.done) })
 		return true
 	}
 	r.broadcast(left, nil)
@@ -257,6 +261,7 @@ func (r *Room) closeAll(reason string) {
 		c.Send(Message{Type: "session-closed", Reason: reason})
 		c.CloseSoon()
 	}
+	r.closeOnce.Do(func() { close(r.done) })
 }
 
 func (r *Room) scheduleSaveLocked() {

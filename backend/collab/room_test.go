@@ -5,26 +5,38 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 )
 
 type fakeStore struct {
-	mu     sync.Mutex
-	scene  []byte
-	saved  [][]byte
-	failed bool
+	mu          sync.Mutex
+	scene       []byte
+	saved       [][]byte
+	failed      bool
+	saveStarted chan struct{}
+	saveRelease chan struct{}
 }
 
 func (s *fakeStore) LoadScene(projectID string) ([]byte, error) {
 	if s.failed {
 		return nil, fmt.Errorf("load failed")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.scene, nil
 }
 
 func (s *fakeStore) SaveScene(projectID string, scene []byte) error {
+	if s.saveStarted != nil {
+		s.saveStarted <- struct{}{}
+	}
+	if s.saveRelease != nil {
+		<-s.saveRelease
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.saved = append(s.saved, scene)
+	s.scene = scene
 	return nil
 }
 
@@ -196,5 +208,51 @@ func TestJoinLoadFailure(t *testing.T) {
 	}
 	if _, err := hub.Join("p1", a); err == nil {
 		t.Fatal("expected error on second join too (broken room must not be cached)")
+	}
+}
+
+func TestRejoinDuringFinalSaveSeesSavedScene(t *testing.T) {
+	store := &fakeStore{
+		scene:       []byte(`{}`),
+		saveStarted: make(chan struct{}, 1),
+		saveRelease: make(chan struct{}),
+	}
+	hub := NewHub(store)
+	a := &fakeClient{user: UserInfo{ID: "ua", Name: "A", Role: "editor"}}
+	room, err := hub.Join("p1", a)
+	if err != nil {
+		t.Fatalf("join a: %v", err)
+	}
+	room.ApplyUpdate(a, []json.RawMessage{el("e1", 1, "a1")})
+
+	leaveDone := make(chan struct{})
+	go func() {
+		hub.Leave("p1", room, a)
+		close(leaveDone)
+	}()
+	<-store.saveStarted // final save is now in flight
+
+	joinDone := make(chan *fakeClient)
+	go func() {
+		b := &fakeClient{user: UserInfo{ID: "ub", Name: "B", Role: "editor"}}
+		if _, err := hub.Join("p1", b); err != nil {
+			t.Errorf("join b: %v", err)
+		}
+		joinDone <- b
+	}()
+
+	select {
+	case <-joinDone:
+		t.Fatal("join must not complete while the final save is in flight")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(store.saveRelease)
+	<-leaveDone
+	b := <-joinDone
+
+	msgs := b.messages()
+	if len(msgs) == 0 || msgs[0].Type != "init" || len(msgs[0].Elements) != 1 {
+		t.Fatalf("expected fresh room init with the saved element, got %+v", msgs)
 	}
 }
