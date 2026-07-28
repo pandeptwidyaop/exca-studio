@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Project } from '../types';
 import pb from '../lib/pocketbase';
 import useProjectSearch from '../hooks/useProjectSearch';
+import ShareDialog from './ShareDialog';
 
 interface SidebarProps {
   projects: Project[];
@@ -32,6 +33,7 @@ export default function Sidebar({
   const [editName, setEditName] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
+  const [shareProjectId, setShareProjectId] = useState<string | null>(null);
 
   const {
     query: searchQuery,
@@ -287,6 +289,15 @@ export default function Sidebar({
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
+                          onClick={() => {
+                            setShareProjectId(project.id);
+                            setContextMenuId(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 text-gray-300 flex items-center gap-2"
+                        >
+                          🔗 Share
+                        </button>
+                        <button
                           onClick={() => startEdit(project)}
                           className="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 text-gray-300 flex items-center gap-2"
                         >
@@ -395,6 +406,14 @@ export default function Sidebar({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share dialog */}
+      {shareProjectId && (
+        <ShareDialog
+          project={projects.find((p) => p.id === shareProjectId)!}
+          onClose={() => setShareProjectId(null)}
+        />
       )}
     </>
   );
