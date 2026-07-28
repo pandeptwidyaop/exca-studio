@@ -108,6 +108,10 @@ export default function Sidebar({
     setContextMenuId(null);
   };
 
+  const shareProject = shareProjectId
+    ? projects.find((p) => p.id === shareProjectId) ?? null
+    : null;
+
   return (
     <>
       <div
@@ -409,9 +413,9 @@ export default function Sidebar({
       )}
 
       {/* Share dialog */}
-      {shareProjectId && (
+      {shareProject && (
         <ShareDialog
-          project={projects.find((p) => p.id === shareProjectId)!}
+          project={shareProject}
           onClose={() => setShareProjectId(null)}
         />
       )}
