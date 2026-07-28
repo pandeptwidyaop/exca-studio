@@ -10,6 +10,7 @@ import type { Project } from './types';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [sharedProjects, setSharedProjects] = useState<Project[]>([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -34,12 +35,14 @@ function App() {
 
   const loadProjects = useCallback(async () => {
     try {
+      const myId = pb.authStore.model?.id;
+      // Collection rules scope this to own + member projects
       const records = await pb.collection('projects').getFullList({
         sort: '-created',
-        filter: `user = "${pb.authStore.model?.id}"`,
       });
-
-      setProjects(records as unknown as Project[]);
+      const all = records as unknown as Project[];
+      setProjects(all.filter((p) => p.user === myId));
+      setSharedProjects(all.filter((p) => p.user !== myId));
     } catch (err) {
       console.error('Failed to load projects:', err);
     } finally {
@@ -62,6 +65,7 @@ function App() {
     pb.authStore.clear();
     setIsAuthenticated(false);
     setProjects([]);
+    setSharedProjects([]);
     setProjectsLoaded(false);
   };
 
@@ -104,6 +108,7 @@ function App() {
       {sidebarOpen && (
         <Sidebar
           projects={projects}
+          sharedProjects={sharedProjects}
           currentProjectId={activeProjectId}
           onSelectProject={handleSelectProject}
           onCreated={handleCreated}
@@ -129,9 +134,9 @@ function App() {
           </button>
         )}
         <Routes>
-          <Route path="/" element={<Home projects={projects} loaded={projectsLoaded} />} />
+          <Route path="/" element={<Home projects={projects} sharedProjects={sharedProjects} loaded={projectsLoaded} />} />
           <Route path="/project/:id" element={<CanvasRoute />} />
-          <Route path="*" element={<Home projects={projects} loaded={projectsLoaded} />} />
+          <Route path="*" element={<Home projects={projects} sharedProjects={sharedProjects} loaded={projectsLoaded} />} />
         </Routes>
       </div>
     </div>

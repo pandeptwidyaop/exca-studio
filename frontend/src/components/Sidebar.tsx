@@ -5,6 +5,7 @@ import useProjectSearch from '../hooks/useProjectSearch';
 
 interface SidebarProps {
   projects: Project[];
+  sharedProjects: Project[];
   currentProjectId: string | null;
   onSelectProject: (project: Project) => void;
   onCreated: (project: Project) => void;
@@ -16,6 +17,7 @@ interface SidebarProps {
 
 export default function Sidebar({
   projects,
+  sharedProjects,
   currentProjectId,
   onSelectProject,
   onCreated,
@@ -39,8 +41,14 @@ export default function Sidebar({
   } = useProjectSearch();
 
   const isSearching = searchQuery.trim() !== '';
-  // While the first response is pending (results null), keep showing the full list
-  const visibleProjects = isSearching ? (searchResults ?? projects) : projects;
+  const myId = pb.authStore.model?.id;
+  const visibleShared = isSearching
+    ? (searchResults ?? sharedProjects).filter((p) => p.user !== myId)
+    : sharedProjects;
+
+  const visibleProjects = isSearching
+    ? (searchResults ?? projects).filter((p) => p.user === myId)
+    : projects;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,13 +306,42 @@ export default function Sidebar({
             ))}
           </div>
 
-          {isSearching && searchResults && searchResults.length === 0 && (
+          {/* Shared with me */}
+          {visibleShared.length > 0 && (
+            <>
+              <h2 className="text-sm font-semibold text-gray-400 uppercase mt-6 mb-3">
+                Shared with me
+              </h2>
+              <div className="space-y-1">
+                {visibleShared.map((project) => (
+                  <button
+                    key={project.id}
+                    onClick={() => onSelectProject(project)}
+                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors truncate ${
+                      currentProjectId === project.id
+                        ? 'bg-blue-600 text-white'
+                        : 'hover:bg-gray-800 text-gray-300'
+                    }`}
+                  >
+                    {project.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {isSearching &&
+            searchResults &&
+            searchResults.length === 0 && (
             <p className="text-gray-500 text-sm text-center mt-4">
               No projects found
             </p>
           )}
 
-          {!isSearching && projects.length === 0 && !isCreating && (
+          {!isSearching &&
+            projects.length === 0 &&
+            sharedProjects.length === 0 &&
+            !isCreating && (
             <p className="text-gray-500 text-sm text-center mt-4">
               No projects yet. Create one!
             </p>
