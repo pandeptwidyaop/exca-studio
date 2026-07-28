@@ -9,6 +9,10 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8092',
       '/_': 'http://localhost:8092',
+      '/ws': {
+        target: 'http://localhost:8092',
+        ws: true,
+      },
     },
   },
 })
