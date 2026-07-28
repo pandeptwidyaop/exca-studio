@@ -1,3 +1,5 @@
+## [1.4.0](https://github.com/pandeptwidyaop/exca-studio/compare/v1.3.0...v1.4.0) (2026-07-28)
+
 ## [1.3.0](https://github.com/pandeptwidyaop/exca-studio/compare/v1.2.0...v1.3.0) (2026-07-09)
 
 ## [1.2.0](https://github.com/pandeptwidyaop/exca-studio/compare/v1.1.0...v1.2.0) (2026-07-09)
