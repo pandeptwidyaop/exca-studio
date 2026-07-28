@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	_ "excalidraw-studio-backend/migrations"
+	"excalidraw-studio-backend/collab"
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase"
@@ -37,9 +38,18 @@ func main() {
 		Automigrate: true,
 	})
 
+	hub := collab.NewHub(collab.NewStore(app))
+
 	// Setup routes on serve
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		setupRoutes(e, app)
+		collab.Register(e, app, hub)
+		return nil
+	})
+
+	// Kill live collab sessions when a project is deleted via the API
+	app.OnRecordAfterDeleteRequest("projects").Add(func(e *core.RecordDeleteEvent) error {
+		hub.CloseProject(e.Record.Id, "deleted")
 		return nil
 	})
 
