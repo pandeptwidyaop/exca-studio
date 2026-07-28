@@ -186,3 +186,15 @@ func TestKickSendsSessionClosed(t *testing.T) {
 		t.Fatal("expected b to receive session-closed(removed)")
 	}
 }
+
+func TestJoinLoadFailure(t *testing.T) {
+	store := &fakeStore{failed: true}
+	hub := NewHub(store)
+	a := &fakeClient{user: UserInfo{ID: "ua", Name: "A", Role: "editor"}}
+	if _, err := hub.Join("p1", a); err == nil {
+		t.Fatal("expected error when scene load fails")
+	}
+	if _, err := hub.Join("p1", a); err == nil {
+		t.Fatal("expected error on second join too (broken room must not be cached)")
+	}
+}

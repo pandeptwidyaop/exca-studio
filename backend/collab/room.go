@@ -34,6 +34,8 @@ type storedElement struct {
 type Room struct {
 	projectID string
 	store     SceneStore
+	loadOnce  sync.Once
+	loadErr   error
 
 	mu        sync.Mutex
 	clients   map[RoomClient]struct{}
@@ -52,8 +54,8 @@ type sceneJSON struct {
 	Files    map[string]json.RawMessage `json:"files"`
 }
 
-func newRoom(projectID string, store SceneStore) (*Room, error) {
-	r := &Room{
+func newRoom(projectID string, store SceneStore) *Room {
+	return &Room{
 		projectID: projectID,
 		store:     store,
 		clients:   make(map[RoomClient]struct{}),
@@ -61,16 +63,28 @@ func newRoom(projectID string, store SceneStore) (*Room, error) {
 		files:     make(map[string]json.RawMessage),
 		appState:  json.RawMessage("{}"),
 	}
-	raw, err := store.LoadScene(projectID)
+}
+
+// ensureLoaded loads the scene from the store exactly once per room.
+// Callers must not join clients before this returns nil.
+func (r *Room) ensureLoaded() error {
+	r.loadOnce.Do(func() { r.loadErr = r.load() })
+	return r.loadErr
+}
+
+func (r *Room) load() error {
+	raw, err := r.store.LoadScene(r.projectID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var scene sceneJSON
 	if len(raw) > 0 && string(raw) != "null" {
 		if err := json.Unmarshal(raw, &scene); err != nil {
-			log.Printf("collab: project %s scene unparsable, starting empty: %v", projectID, err)
+			log.Printf("collab: project %s scene unparsable, starting empty: %v", r.projectID, err)
 		}
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	for _, el := range scene.Elements {
 		var meta elementMeta
 		if err := json.Unmarshal(el, &meta); err != nil || meta.ID == "" {
@@ -85,12 +99,18 @@ func newRoom(projectID string, store SceneStore) (*Room, error) {
 	if scene.Files != nil {
 		r.files = scene.Files
 	}
-	return r, nil
+	return nil
 }
 
 // join registers the client, sends it the init snapshot, and announces it.
-func (r *Room) join(c RoomClient) {
+// Returns false when the room has already been closed — the caller retries
+// with a fresh room.
+func (r *Room) join(c RoomClient) bool {
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return false
+	}
 	r.clients[c] = struct{}{}
 	init := Message{
 		Type:     "init",
@@ -103,6 +123,7 @@ func (r *Room) join(c RoomClient) {
 
 	c.Send(init)
 	r.broadcast(joined, c)
+	return true
 }
 
 // leave unregisters the client. Returns true when the room became empty
@@ -245,7 +266,11 @@ func (r *Room) scheduleSaveLocked() {
 	r.saveTimer = time.AfterFunc(saveDebounce, func() {
 		r.mu.Lock()
 		r.saveTimer = nil
+		closed := r.closed
 		r.mu.Unlock()
+		if closed {
+			return // shutdown persistence is owned by the final save
+		}
 		r.save(false)
 	})
 }
@@ -272,15 +297,18 @@ func (r *Room) save(final bool) {
 		return
 	}
 	if err := r.store.SaveScene(r.projectID, data); err != nil {
-		if final {
+		r.mu.Lock()
+		closedNow := r.closed
+		if !closedNow {
+			r.dirty = true
+			r.scheduleSaveLocked()
+		}
+		r.mu.Unlock()
+		if final || closedNow {
 			log.Printf("collab: FINAL SAVE FAILED for project %s — latest collab state lost: %v", r.projectID, err)
 			return
 		}
 		log.Printf("collab: save scene %s (will retry): %v", r.projectID, err)
-		r.mu.Lock()
-		r.dirty = true
-		r.scheduleSaveLocked()
-		r.mu.Unlock()
 	}
 }
 

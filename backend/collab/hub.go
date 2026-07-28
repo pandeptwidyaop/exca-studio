@@ -14,29 +14,49 @@ func NewHub(store SceneStore) *Hub {
 }
 
 // Join returns the project's room (creating and loading it when needed)
-// with the client already registered and initialized.
+// with the client already registered and initialized. h.mu is held only
+// for map access — never across store or client I/O.
 func (h *Hub) Join(projectID string, c RoomClient) (*Room, error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	room, ok := h.rooms[projectID]
-	if !ok {
-		var err error
-		room, err = newRoom(projectID, h.store)
-		if err != nil {
+	for {
+		h.mu.Lock()
+		room, ok := h.rooms[projectID]
+		if !ok {
+			room = newRoom(projectID, h.store)
+			h.rooms[projectID] = room
+		}
+		h.mu.Unlock()
+
+		if err := room.ensureLoaded(); err != nil {
+			h.mu.Lock()
+			if h.rooms[projectID] == room {
+				delete(h.rooms, projectID)
+			}
+			h.mu.Unlock()
 			return nil, err
 		}
-		h.rooms[projectID] = room
+
+		if room.join(c) {
+			return room, nil
+		}
+
+		// The room closed between lookup and join (last client left or the
+		// project was deleted). Drop the dead room and retry.
+		h.mu.Lock()
+		if h.rooms[projectID] == room {
+			delete(h.rooms, projectID)
+		}
+		h.mu.Unlock()
 	}
-	room.join(c)
-	return room, nil
 }
 
 // Leave removes the client and tears the room down when it became empty.
 func (h *Hub) Leave(projectID string, room *Room, c RoomClient) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if room.leave(c) && h.rooms[projectID] == room {
-		delete(h.rooms, projectID)
+	if room.leave(c) {
+		h.mu.Lock()
+		if h.rooms[projectID] == room {
+			delete(h.rooms, projectID)
+		}
+		h.mu.Unlock()
 	}
 }
 
