@@ -51,6 +51,7 @@ func Register(e *core.ServeEvent, app *pocketbase.PocketBase, hub *Hub) {
 	e.Router.GET("/ws/collab/:projectId", func(c echo.Context) error {
 		return serveWS(c, app, hub)
 	})
+	registerMemberRoutes(e, app, hub)
 }
 
 func serveWS(c echo.Context, app *pocketbase.PocketBase, hub *Hub) error {
